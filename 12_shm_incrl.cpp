@@ -294,6 +294,43 @@ void mmap_size_test_12_15(int filesize, int mmapsize)
 }
 
 
+/*
+   This explains how to handle mapping a file which of size has been creasing.
+   If you don't care the size, you will face an error of Segmantation fault or Bus error,
+   tested in mmap_size_test_12_15().
+*/
+void mmap_incr_size_12_19()
+{
+    int fd;
+
+    {
+        const char* const inpf = "./_temp_12_10.txt";
+        const mode_t fmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // permission 0644
+
+        fd = open(inpf, O_RDWR | O_CREAT | O_TRUNC, fmode); // O_TRUNC trancates the size to 0
+    }
+
+    char* ptr;
+    const size_t mapsize_in_bytes = 32768;
+
+    {
+        const off_t offset = 0;
+        ptr = reinterpret_cast<char*>(mmap(NULL, mapsize_in_bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, offset));
+    }
+
+    for (int i = 0; i <= mapsize_in_bytes; i+= 4096)
+    {
+        VPRINTF("setting file size to %d\n", i);
+
+        const off_t len = i;
+        ftruncate(fd, len); // helps to handle a memmory mapping and its access
+
+        VPRINTF("ptr[%d] = %d\n", i-1, ptr[i-1]);
+    }
+
+}
+
+
 int main(int argc, char **argv)
 {
     const bool run_fork_12_03 = false;
@@ -301,6 +338,7 @@ int main(int argc, char **argv)
     const bool run_memory_base_semaphore_12_12 = false;
     const bool run_anonymous_12_14 = false;
     const bool run_mmap_size_test_12_15 = false;
+    const bool run_mmap_incr_size_12_19 = true;
 
     if (run_fork_12_03)
         fork_12_03();
@@ -322,6 +360,9 @@ int main(int argc, char **argv)
         //mmap_size_test_12_15(5000, 5000);
         mmap_size_test_12_15(5000, 15000);
     }
+
+    if (run_mmap_incr_size_12_19)
+        mmap_incr_size_12_19();
 
     return 0; 
 }
