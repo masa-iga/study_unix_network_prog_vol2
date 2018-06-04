@@ -3,11 +3,15 @@
 #include <semaphore.h>
 #include <unistd.h> // for fork()
 #include <sys/mman.h> // for mmap()
+#include <algorithm>
+
+using namespace std;
 
 const char* kSemName = "/tmp/mysem";
 static int g_count = 0;
 const int g_nloop = 100;
 
+#define TEST_BASED_SEMAPHORE (0)
 
 #define VPRINTF(...) \
     do {\
@@ -132,6 +136,7 @@ void mmap_12_10()
 }
 
 
+#if TEST_BASED_SEMAPHORE
 void memory_base_semaphore_12_12()
 {
     VPRINTF("start\n");
@@ -194,6 +199,7 @@ void memory_base_semaphore_12_12()
 
     exit(0);
 }
+#endif // TEST_BASED_SEMAPHORE
 
 
 /*
@@ -250,12 +256,51 @@ void anonymous_12_14()
 }
 
 
+void mmap_size_test_12_15(int filesize, int mmapsize)
+{
+    VPRINTF("file size %d (0x%x)  mmap size %d (0x%x)\n", filesize, filesize, mmapsize, mmapsize);
+
+    /* file open: create a new file or cut down an existing file, and set file size */
+    uint8_t* ptr;
+
+    {
+        const char* const inpf = "./_temp_12_10.txt";
+        const size_t count = 1;
+
+        int fd = open(inpf, O_RDWR | O_CREAT | O_TRUNC, 0644);
+        lseek(fd, filesize - 1, SEEK_SET);
+        write(fd, "0", count);
+
+        const off_t offset = 0;
+        ptr = reinterpret_cast<uint8_t*>(mmap(NULL, mmapsize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, offset));
+        close(fd);
+    }
+
+    const int pagesize = sysconf(_SC_PAGESIZE);
+    VPRINTF("page size %d\n", pagesize);
+
+    int idx;
+    for (idx = 0; idx < max(filesize, mmapsize); idx += pagesize)
+    {
+        VPRINTF("ptr[%d] = %d\n", idx, ptr[idx]);
+        ptr[idx] = 1;
+
+        VPRINTF("ptr[%d] = %d\n", idx + pagesize - 1, ptr[idx + pagesize - 1]);
+        ptr[idx + pagesize - 1] = 1;
+    }
+
+    VPRINTF("ptr[%d] = %d\n", idx, ptr[idx]);
+
+}
+
+
 int main(int argc, char **argv)
 {
     const bool run_fork_12_03 = false;
     const bool run_mmap_12_10 = false;
     const bool run_memory_base_semaphore_12_12 = false;
-    const bool run_anonymous_12_14 = true;
+    const bool run_anonymous_12_14 = false;
+    const bool run_mmap_size_test_12_15 = false;
 
     if (run_fork_12_03)
         fork_12_03();
@@ -265,12 +310,19 @@ int main(int argc, char **argv)
 
     /* it looks memory based semaphore doesn't work well in MacOS */
     if (run_memory_base_semaphore_12_12)
+#if TEST_BASED_SEMAPHORE
         memory_base_semaphore_12_12();
+#endif // TEST_BASED_SEMAPHORE
 
     if (run_anonymous_12_14)
         anonymous_12_14();
 
+    if (run_mmap_size_test_12_15)
+    {
+        //mmap_size_test_12_15(5000, 5000);
+        mmap_size_test_12_15(5000, 15000);
+    }
+
     return 0; 
 }
 
-// todo: impl memory_base_semaphore_12_12()
