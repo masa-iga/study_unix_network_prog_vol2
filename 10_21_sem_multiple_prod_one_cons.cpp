@@ -119,4 +119,3 @@ void *consume(void *arg)
     return (NULL);
 }
 
-// todo: read the book
